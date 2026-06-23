@@ -1,0 +1,209 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MachineMonitor.ViewModels"
+        xmlns:views="using:MachineMonitor.Views"
+        x:Class="MachineMonitor.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="MachineMonitor"
+        Width="960" Height="640"
+        MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="#0F1923">
+
+    <Window.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:ConnectionViewModel}">
+            <views:ConnectionView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
+            <views:DashboardView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LogViewModel}">
+            <views:LogView />
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Window.Styles>
+        <!-- Nav button: inactive -->
+        <Style Selector="Button.nav-item">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8899BB"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,9"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0D1825"/>
+        </Style>
+        <!-- Nav button: active = disabled state styled as highlighted -->
+        <Style Selector="Button.nav-item:disabled">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Button.nav-item:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0D2847"/>
+            <Setter Property="TextElement.Foreground" Value="#00B4D8"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="200,*">
+
+        <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+        <Border Grid.Column="0" Background="#111D2C">
+            <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+                <!-- Logo -->
+                <Border Grid.Row="0" Padding="20,26,20,22">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Border Width="38" Height="38" CornerRadius="10" Background="#00B4D8">
+                            <TextBlock Text="M"
+                                       FontSize="20" FontWeight="Black"
+                                       Foreground="#0F1923"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" Spacing="0">
+                            <TextBlock Text="Machine" FontSize="13" FontWeight="Bold" Foreground="#E2E8F0"/>
+                            <TextBlock Text="Monitor" FontSize="13" FontWeight="Bold" Foreground="#00B4D8"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Separator -->
+                <Border Grid.Row="1" Height="1" Margin="20,0" Background="#1E2D40"/>
+
+                <!-- Navigation + Status -->
+                <StackPanel Grid.Row="2" Margin="14,20,14,0" Spacing="4">
+
+                    <!-- ── Navegação (só quando conectado) ── -->
+                    <StackPanel IsVisible="{Binding IsConnected}" Spacing="4" Margin="0,0,0,14">
+                        <TextBlock Text="NAVEGAÇÃO"
+                                   FontSize="9" FontWeight="Bold"
+                                   Foreground="#4A5568"
+                                   Margin="6,0,0,6"
+                                   LetterSpacing="1"/>
+
+                        <Button Classes="nav-item"
+                                Command="{Binding ShowDashboardCommand}"
+                                IsEnabled="{Binding !IsOnDashboard}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="⬛" FontSize="9" VerticalAlignment="Center" Opacity="0.6"/>
+                                <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="nav-item"
+                                Command="{Binding ShowLogsCommand}"
+                                IsEnabled="{Binding !IsOnLogs}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="≡" FontSize="13" VerticalAlignment="Center" Opacity="0.6"/>
+                                <TextBlock Text="Histórico" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Border Height="1" Background="#1E2D40" Margin="6,6,6,0"/>
+                    </StackPanel>
+
+                    <!-- ── STATUS DO SISTEMA ── -->
+                    <TextBlock Text="STATUS DO SISTEMA"
+                               FontSize="9" FontWeight="Bold"
+                               Foreground="#4A5568"
+                               Margin="6,0,0,8"
+                               LetterSpacing="1"/>
+
+                    <!-- Connection -->
+                    <Border Background="#0D1825" CornerRadius="8" Padding="10,12">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse Width="10" Height="10"
+                                     Fill="{Binding ConnectionStatusColor}"
+                                     VerticalAlignment="Center"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="CONEXÃO"
+                                           FontSize="9" FontWeight="Bold"
+                                           Foreground="#4A5568"/>
+                                <TextBlock Text="{Binding ConnectionStatusLabel}"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="#E2E8F0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Machine -->
+                    <Border Background="#0D1825" CornerRadius="8" Padding="10,12">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse Width="10" Height="10"
+                                     Fill="{Binding MachineStatusColor}"
+                                     VerticalAlignment="Center"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="MÁQUINA"
+                                           FontSize="9" FontWeight="Bold"
+                                           Foreground="#4A5568"/>
+                                <TextBlock Text="{Binding MachineStatusLabel}"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="#E2E8F0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Alarm -->
+                    <Border Background="#0D1825" CornerRadius="8" Padding="10,12">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse Width="10" Height="10"
+                                     Fill="{Binding AlarmStatusColor}"
+                                     VerticalAlignment="Center"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="ALARME"
+                                           FontSize="9" FontWeight="Bold"
+                                           Foreground="#4A5568"/>
+                                <TextBlock Text="{Binding AlarmStatusLabel}"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="#E2E8F0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+
+                <!-- Footer -->
+                <Border Grid.Row="3" Padding="20,14">
+                    <TextBlock Text="v1.1  —  Industrial SCADA"
+                               FontSize="10"
+                               Foreground="#2D3748"/>
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <!-- ═══════════════════ MAIN AREA ═══════════════════ -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*" Background="#0F1923">
+
+            <!-- Header bar -->
+            <Border Grid.Row="0"
+                    Background="#0D1522"
+                    Padding="24,14"
+                    BorderBrush="#1E2D40"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="3" Height="16" CornerRadius="2"
+                                Background="#00B4D8" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding PageTitle}"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="#E2E8F0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1"
+                               Text="Industrial SCADA Simulator"
+                               FontSize="11"
+                               Foreground="#2D3748"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- View content -->
+            <ContentControl Grid.Row="1" Content="{Binding CurrentView}"/>
+
+        </Grid>
+    </Grid>
+</Window>

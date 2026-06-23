@@ -1,0 +1,155 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MachineMonitor.ViewModels"
+             x:Class="MachineMonitor.Views.ConnectionView"
+             x:DataType="vm:ConnectionViewModel"
+             Background="#0F1923">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.field-label">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#4A5568"/>
+            <Setter Property="LetterSpacing" Value="0.5"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="#0D1522"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="#1E2D40"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="CaretBrush" Value="#00B4D8"/>
+        </Style>
+        <Style Selector="TextBox:focus">
+            <Setter Property="BorderBrush" Value="#00B4D8"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Centered vertically and horizontally -->
+    <Grid RowDefinitions="*,Auto,*">
+        <Border Grid.Row="1"
+                Background="#111D2C"
+                CornerRadius="14"
+                Padding="40,36"
+                MaxWidth="420"
+                HorizontalAlignment="Center"
+                BorderBrush="#1E2D40"
+                BorderThickness="1">
+
+            <StackPanel Spacing="24">
+
+                <!-- Header -->
+                <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                        <Border Width="28" Height="28" CornerRadius="6" Background="#0D1522"
+                                BorderBrush="#1E2D40" BorderThickness="1">
+                            <Ellipse Width="10" Height="10"
+                                     Fill="{Binding StatusIndicatorColor}"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="CONEXÃO MODBUS TCP"
+                                   FontSize="13" FontWeight="Bold"
+                                   Foreground="#E2E8F0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding StatusMessage}"
+                               FontSize="11"
+                               Foreground="#4A5568"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Divider -->
+                <Border Height="1" Background="#1E2D40"/>
+
+                <!-- Mode selector -->
+                <StackPanel Spacing="7">
+                    <TextBlock Text="MODO DE OPERAÇÃO" Classes="field-label"/>
+                    <ComboBox ItemsSource="{Binding Modes}"
+                              SelectedItem="{Binding SelectedMode}"
+                              IsEnabled="{Binding !IsConnected}"
+                              HorizontalAlignment="Stretch"
+                              Background="#0D1522"
+                              BorderBrush="#1E2D40"
+                              Foreground="#E2E8F0"/>
+                    <TextBlock Text="Host e porta são ignorados no modo Simulado."
+                               FontSize="10" Foreground="#4A5568"
+                               IsVisible="{Binding IsSimulatedMode}"/>
+                </StackPanel>
+
+                <!-- Host -->
+                <StackPanel Spacing="7">
+                    <TextBlock Text="HOST / ENDEREÇO IP" Classes="field-label"/>
+                    <TextBox Text="{Binding Host}"/>
+                </StackPanel>
+
+                <!-- Port + Unit ID -->
+                <Grid ColumnDefinitions="*,16,*">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="PORTA" Classes="field-label"/>
+                        <TextBox Text="{Binding Port}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="7">
+                        <TextBlock Text="UNIT ID" Classes="field-label"/>
+                        <TextBox Text="{Binding UnitId}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Buttons -->
+                <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+
+                    <Button Content="Conectar"
+                            Command="{Binding ConnectCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            CornerRadius="7"
+                            Padding="0,11"
+                            FontSize="13"
+                            FontWeight="Bold">
+                        <Button.Styles>
+                            <Style Selector="Button">
+                                <Setter Property="Background" Value="#0077B6"/>
+                                <Setter Property="Foreground" Value="#E2E8F0"/>
+                            </Style>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#0096C7"/>
+                            </Style>
+                            <Style Selector="Button:disabled /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#1E2D40"/>
+                                <Setter Property="TextElement.Foreground" Value="#4A5568"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+
+                    <Button Grid.Column="2"
+                            Content="Desconectar"
+                            Command="{Binding DisconnectCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            CornerRadius="7"
+                            Padding="0,11"
+                            FontSize="13"
+                            FontWeight="Bold">
+                        <Button.Styles>
+                            <Style Selector="Button">
+                                <Setter Property="Background" Value="#7B1631"/>
+                                <Setter Property="Foreground" Value="#E2E8F0"/>
+                            </Style>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#9B1B3B"/>
+                            </Style>
+                            <Style Selector="Button:disabled /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#1E2D40"/>
+                                <Setter Property="TextElement.Foreground" Value="#4A5568"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+
+                </Grid>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

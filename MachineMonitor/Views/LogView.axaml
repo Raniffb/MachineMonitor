@@ -1,0 +1,169 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MachineMonitor.ViewModels"
+             xmlns:models="using:MachineMonitor.Models"
+             x:Class="MachineMonitor.Views.LogView"
+             x:DataType="vm:LogViewModel"
+             Background="#0F1923">
+
+    <UserControl.Styles>
+
+        <!-- Nav button: active = disabled state styled as highlighted -->
+        <Style Selector="Button.nav-btn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8899BB"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.nav-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0D1825"/>
+        </Style>
+
+        <!-- Action button (export / clear) -->
+        <Style Selector="Button.action-btn">
+            <Setter Property="Background" Value="#0D1522"/>
+            <Setter Property="Foreground" Value="#CBD5E0"/>
+            <Setter Property="BorderBrush" Value="#1E2D40"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="Button.action-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#152033"/>
+        </Style>
+
+        <!-- Column header labels -->
+        <Style Selector="TextBlock.col-header">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#4A5568"/>
+            <Setter Property="LetterSpacing" Value="0.5"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Row timestamp -->
+        <Style Selector="TextBlock.row-ts">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontFamily" Value="Consolas,monospace"/>
+            <Setter Property="Foreground" Value="#8899BB"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Row message -->
+        <Style Selector="TextBlock.row-msg">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#CBD5E0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+        <!-- ── Header ──────────────────────────────────────────────── -->
+        <Border Grid.Row="0" Padding="24,18,24,14">
+            <Grid ColumnDefinitions="Auto,*,Auto,8,Auto">
+
+                <!-- Icon + title -->
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border Width="32" Height="32" CornerRadius="8"
+                            Background="#0D1522" BorderBrush="#1E2D40" BorderThickness="1">
+                        <TextBlock Text="≡" FontSize="16" Foreground="#00B4D8"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                        <TextBlock Text="HISTÓRICO DE EVENTOS"
+                                   FontSize="13" FontWeight="Bold" Foreground="#E2E8F0"/>
+                        <TextBlock FontSize="10" Foreground="#4A5568">
+                            <TextBlock.Text>
+                                <Binding Path="Entries.Count" StringFormat="{}{0} registros (máx. 100)"/>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Export button -->
+                <Button Grid.Column="2"
+                        Classes="action-btn"
+                        Content="Exportar CSV"
+                        Command="{Binding ExportToCsvCommand}"/>
+
+                <!-- Clear button -->
+                <Button Grid.Column="4"
+                        Classes="action-btn"
+                        Content="Limpar"
+                        Command="{Binding ClearLogsCommand}"
+                        Foreground="#FF5252"/>
+            </Grid>
+        </Border>
+
+        <!-- ── Column headers ──────────────────────────────────────── -->
+        <Border Grid.Row="1"
+                Background="#0A1520"
+                Padding="24,8"
+                BorderBrush="#1E2D40"
+                BorderThickness="0,1,0,1">
+            <Grid ColumnDefinitions="80,16,130,16,*">
+                <TextBlock Classes="col-header" Text="HORÁRIO"/>
+                <TextBlock Grid.Column="2" Classes="col-header" Text="EVENTO"/>
+                <TextBlock Grid.Column="4" Classes="col-header" Text="MENSAGEM"/>
+            </Grid>
+        </Border>
+
+        <!-- ── Empty state ─────────────────────────────────────────── -->
+        <Border Grid.Row="2" Padding="0,48" IsVisible="{Binding Entries.Count, Converter={x:Static ObjectConverters.IsNull}}">
+            <TextBlock Text="Nenhum registro ainda."
+                       HorizontalAlignment="Center"
+                       FontSize="13" Foreground="#2D3748"/>
+        </Border>
+
+        <!-- ── Log rows ────────────────────────────────────────────── -->
+        <ScrollViewer Grid.Row="3"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Entries}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type models:MachineLogEntry}">
+                        <Border Padding="24,10"
+                                BorderBrush="#0D1522"
+                                BorderThickness="0,0,0,1">
+                            <Grid ColumnDefinitions="80,16,130,16,*">
+
+                                <!-- Timestamp -->
+                                <TextBlock Classes="row-ts"
+                                           Text="{Binding Timestamp, StringFormat=HH:mm:ss}"/>
+
+                                <!-- Badge -->
+                                <Border Grid.Column="2"
+                                        Background="{Binding BadgeBrush}"
+                                        CornerRadius="5"
+                                        Padding="8,3"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Opacity="0.9">
+                                    <TextBlock Text="{Binding BadgeLabel}"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="#0F1923"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Message -->
+                                <TextBlock Grid.Column="4"
+                                           Classes="row-msg"
+                                           Text="{Binding Message}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>
