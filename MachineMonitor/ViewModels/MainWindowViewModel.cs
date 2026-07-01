@@ -13,28 +13,32 @@ public partial class MainWindowViewModel : ViewModelBase
     // ── Status sidebar ───────────────────────────────────────────────────────
     [ObservableProperty] private IBrush _connectionStatusColor = new SolidColorBrush(Color.Parse("#4A5568"));
     [ObservableProperty] private string _connectionStatusLabel = "Desconectado";
-    [ObservableProperty] private IBrush _machineStatusColor = new SolidColorBrush(Color.Parse("#4A5568"));
-    [ObservableProperty] private string _machineStatusLabel = "---";
-    [ObservableProperty] private IBrush _alarmStatusColor = new SolidColorBrush(Color.Parse("#4A5568"));
-    [ObservableProperty] private string _alarmStatusLabel = "---";
+    [ObservableProperty] private IBrush _machineStatusColor    = new SolidColorBrush(Color.Parse("#4A5568"));
+    [ObservableProperty] private string _machineStatusLabel    = "---";
+    [ObservableProperty] private IBrush _alarmStatusColor      = new SolidColorBrush(Color.Parse("#4A5568"));
+    [ObservableProperty] private string _alarmStatusLabel      = "---";
 
     // ── Estado de navegação ──────────────────────────────────────────────────
     [ObservableProperty] private bool _isConnected;
     [ObservableProperty] private bool _isOnDashboard;
     [ObservableProperty] private bool _isOnLogs;
+    [ObservableProperty] private bool _isOnTrends;
 
     public ConnectionViewModel ConnectionViewModel { get; }
-    public DashboardViewModel DashboardViewModel { get; }
-    public LogViewModel LogViewModel { get; }
+    public DashboardViewModel  DashboardViewModel  { get; }
+    public LogViewModel        LogViewModel        { get; }
+    public TrendsViewModel     TrendsViewModel     { get; }
 
     public MainWindowViewModel(
         ConnectionViewModel connectionViewModel,
-        DashboardViewModel dashboardViewModel,
-        LogViewModel logViewModel)
+        DashboardViewModel  dashboardViewModel,
+        LogViewModel        logViewModel,
+        TrendsViewModel     trendsViewModel)
     {
         ConnectionViewModel = connectionViewModel;
         DashboardViewModel  = dashboardViewModel;
         LogViewModel        = logViewModel;
+        TrendsViewModel     = trendsViewModel;
         _currentView        = connectionViewModel;
 
         ConnectionViewModel.PropertyChanged += OnConnectionChanged;
@@ -46,10 +50,11 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ShowDashboard()
     {
-        CurrentView    = DashboardViewModel;
-        PageTitle      = "Dashboard";
-        IsOnDashboard  = true;
-        IsOnLogs       = false;
+        CurrentView   = DashboardViewModel;
+        PageTitle     = "Dashboard";
+        IsOnDashboard = true;
+        IsOnLogs      = false;
+        IsOnTrends    = false;
     }
 
     [RelayCommand]
@@ -59,6 +64,17 @@ public partial class MainWindowViewModel : ViewModelBase
         PageTitle     = "Histórico de Eventos";
         IsOnDashboard = false;
         IsOnLogs      = true;
+        IsOnTrends    = false;
+    }
+
+    [RelayCommand]
+    private void ShowTrends()
+    {
+        CurrentView   = TrendsViewModel;
+        PageTitle     = "Tendências";
+        IsOnDashboard = false;
+        IsOnLogs      = false;
+        IsOnTrends    = true;
     }
 
     // ── Reação a eventos de conexão ──────────────────────────────────────────
@@ -94,6 +110,7 @@ public partial class MainWindowViewModel : ViewModelBase
             PageTitle             = "Configurar Conexão";
             IsOnDashboard         = false;
             IsOnLogs              = false;
+            IsOnTrends            = false;
             ConnectionStatusColor = new SolidColorBrush(Color.Parse("#4A5568"));
             ConnectionStatusLabel = "Desconectado";
             MachineStatusColor    = new SolidColorBrush(Color.Parse("#4A5568"));
@@ -112,12 +129,24 @@ public partial class MainWindowViewModel : ViewModelBase
                 : new SolidColorBrush(Color.Parse("#4A5568"));
             MachineStatusLabel = DashboardViewModel.MachineOn ? "Ligada" : "Desligada";
         }
-        else if (e.PropertyName == nameof(DashboardViewModel.AlarmActive))
+        else if (e.PropertyName == nameof(DashboardViewModel.AlarmActive)
+              || e.PropertyName == nameof(DashboardViewModel.WarningActive))
         {
-            AlarmStatusColor = DashboardViewModel.AlarmActive
-                ? new SolidColorBrush(Color.Parse("#FF3D3D"))
-                : new SolidColorBrush(Color.Parse("#00C853"));
-            AlarmStatusLabel = DashboardViewModel.AlarmActive ? "ATIVO!" : "Normal";
+            if (DashboardViewModel.AlarmActive)
+            {
+                AlarmStatusColor = new SolidColorBrush(Color.Parse("#FF3D3D"));
+                AlarmStatusLabel = "CRÍTICO!";
+            }
+            else if (DashboardViewModel.WarningActive)
+            {
+                AlarmStatusColor = new SolidColorBrush(Color.Parse("#FF9800"));
+                AlarmStatusLabel = "Aviso";
+            }
+            else
+            {
+                AlarmStatusColor = new SolidColorBrush(Color.Parse("#00C853"));
+                AlarmStatusLabel = "Normal";
+            }
         }
     }
 }

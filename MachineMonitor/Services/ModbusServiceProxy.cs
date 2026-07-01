@@ -49,4 +49,6 @@ public class ModbusServiceProxy : IModbusService
 
     public Task<bool> WriteSetpointsAsync(double temperatureSetpoint, double motorSpeedSetpoint) =>
         _current.WriteSetpointsAsync(temperatureSetpoint, motorSpeedSetpoint);
+
+    public Task<bool> ReconnectAsync() => _current.ReconnectAsync();
 }

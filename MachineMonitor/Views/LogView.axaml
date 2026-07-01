@@ -68,7 +68,7 @@
 
         <!-- ── Header ──────────────────────────────────────────────── -->
         <Border Grid.Row="0" Padding="24,18,24,14">
-            <Grid ColumnDefinitions="Auto,*,Auto,8,Auto">
+            <Grid ColumnDefinitions="Auto,*,Auto,8,Auto,8,Auto">
 
                 <!-- Icon + title -->
                 <StackPanel Orientation="Horizontal" Spacing="10">
@@ -88,14 +88,20 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Export button -->
+                <!-- Export events button -->
                 <Button Grid.Column="2"
                         Classes="action-btn"
-                        Content="Exportar CSV"
+                        Content="Exportar Eventos"
                         Command="{Binding ExportToCsvCommand}"/>
 
-                <!-- Clear button -->
+                <!-- Export readings button -->
                 <Button Grid.Column="4"
+                        Classes="action-btn"
+                        Content="Exportar Leituras"
+                        Command="{Binding ExportReadingsToCsvCommand}"/>
+
+                <!-- Clear button -->
+                <Button Grid.Column="6"
                         Classes="action-btn"
                         Content="Limpar"
                         Command="{Binding ClearLogsCommand}"

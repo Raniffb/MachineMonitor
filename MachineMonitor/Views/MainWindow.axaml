@@ -20,6 +20,9 @@
         <DataTemplate DataType="{x:Type vm:LogViewModel}">
             <views:LogView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TrendsViewModel}">
+            <views:TrendsView />
+        </DataTemplate>
     </Window.DataTemplates>
 
     <Window.Styles>
@@ -99,6 +102,15 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="≡" FontSize="13" VerticalAlignment="Center" Opacity="0.6"/>
                                 <TextBlock Text="Histórico" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="nav-item"
+                                Command="{Binding ShowTrendsCommand}"
+                                IsEnabled="{Binding !IsOnTrends}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="∿" FontSize="14" VerticalAlignment="Center" Opacity="0.6"/>
+                                <TextBlock Text="Tendências" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 

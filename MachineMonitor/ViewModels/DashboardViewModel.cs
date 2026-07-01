@@ -13,19 +13,27 @@ namespace MachineMonitor.ViewModels;
 public partial class DashboardViewModel : ViewModelBase, IDisposable
 {
     private readonly IModbusService _modbusService;
-    private readonly ILogService _logService;
+    private readonly ILogService    _logService;
     private CancellationTokenSource? _cts;
-    private bool _previousAlarmActive;
+
+    // Persistência do alarme crítico e detecção de transição
+    private bool   _previousAlarmActive;
     private string _persistedAlarmReason = "";
+
+    // Retry automático: reconecta após N falhas consecutivas
+    private int  _consecutiveErrors         = 0;
+    private const int MaxErrorsBeforeRetry  = 3;
+    private const int MaxReconnectAttempts  = 3;
 
     // ── Leituras do dashboard ────────────────────────────────────────────────
     [ObservableProperty] private double _temperature;
     [ObservableProperty] private double _pressure;
     [ObservableProperty] private double _motorSpeed;
-    [ObservableProperty] private int _productionCount;
+    [ObservableProperty] private int    _productionCount;
     [ObservableProperty] private string _lastUpdate = "--";
-    [ObservableProperty] private bool _machineOn;
-    [ObservableProperty] private bool _alarmActive;
+    [ObservableProperty] private bool   _machineOn;
+    [ObservableProperty] private bool   _alarmActive;
+    [ObservableProperty] private bool   _warningActive;
     [ObservableProperty] private string _machineOnLabel = "DESLIGADA";
     [ObservableProperty] private IBrush _machineOnColor = Brushes.Gray;
     [ObservableProperty] private string _alarmLabel = "INATIVO";
@@ -38,7 +46,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     // ── Inputs de setpoint ───────────────────────────────────────────────────
     [ObservableProperty] private string _temperatureSetpointInput = "75";
-    [ObservableProperty] private string _motorSpeedSetpointInput = "1450";
+    [ObservableProperty] private string _motorSpeedSetpointInput  = "1450";
 
     // ── Feedback de comandos ─────────────────────────────────────────────────
     [ObservableProperty]
@@ -52,7 +60,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public DashboardViewModel(IModbusService modbusService, ILogService logService)
     {
         _modbusService = modbusService;
-        _logService = logService;
+        _logService    = logService;
     }
 
     // ── Polling ──────────────────────────────────────────────────────────────
@@ -60,10 +68,11 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public void StartPolling()
     {
         StopPolling();
-        IsConnected = true;
-        CommandMessage = "";
+        IsConnected           = true;
+        CommandMessage        = "";
         _previousAlarmActive  = false;
         _persistedAlarmReason = "";
+        _consecutiveErrors    = 0;
         _cts = new CancellationTokenSource();
         _ = PollLoopAsync(_cts.Token);
     }
@@ -86,13 +95,15 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
                 if (data != null)
                 {
+                    _consecutiveErrors = 0;
+
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        Temperature    = data.Temperature;
-                        Pressure       = data.Pressure;
-                        MotorSpeed     = data.MotorSpeed;
+                        Temperature     = data.Temperature;
+                        Pressure        = data.Pressure;
+                        MotorSpeed      = data.MotorSpeed;
                         ProductionCount = data.ProductionCount;
-                        LastUpdate     = DateTime.Now.ToString("HH:mm:ss");
+                        LastUpdate      = DateTime.Now.ToString("HH:mm:ss");
 
                         MachineOn      = data.MachineOn;
                         MachineOnLabel = data.MachineOn ? "LIGADA" : "DESLIGADA";
@@ -100,15 +111,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
                             ? new SolidColorBrush(Color.Parse("#00C853"))
                             : new SolidColorBrush(Color.Parse("#555555"));
 
-                        AlarmActive = data.AlarmActive;
-                        AlarmLabel  = data.AlarmActive ? "ATIVO" : "INATIVO";
-                        AlarmColor  = data.AlarmActive
-                            ? new SolidColorBrush(Color.Parse("#FF5252"))
-                            : new SolidColorBrush(Color.Parse("#555555"));
-
-                        // Persiste a razão enquanto o alarme estiver ativo.
-                        // Em modo Modbus TCP o pico dura 1 ciclo; sem persistência
-                        // o motivo sumia e mostrava "causa não identificada".
+                        // Persiste razão do alarme crítico (pico dura 1 ciclo no TCP)
                         if (data.AlarmActive)
                         {
                             if (!string.IsNullOrEmpty(data.AlarmReason))
@@ -118,9 +121,34 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
                         {
                             _persistedAlarmReason = "";
                         }
-                        AlarmReason = data.AlarmActive ? _persistedAlarmReason : "";
 
-                        // Detecta disparo de alarme (transição false→true)
+                        // Prioridade: Crítico > Aviso > Inativo
+                        if (data.AlarmActive)
+                        {
+                            AlarmActive = true;
+                            WarningActive = false;
+                            AlarmLabel  = "CRÍTICO";
+                            AlarmColor  = new SolidColorBrush(Color.Parse("#FF5252"));
+                            AlarmReason = _persistedAlarmReason;
+                        }
+                        else if (data.WarningActive)
+                        {
+                            AlarmActive   = false;
+                            WarningActive = true;
+                            AlarmLabel    = "AVISO";
+                            AlarmColor    = new SolidColorBrush(Color.Parse("#FF9800"));
+                            AlarmReason   = data.WarningReason;
+                        }
+                        else
+                        {
+                            AlarmActive   = false;
+                            WarningActive = false;
+                            AlarmLabel    = "INATIVO";
+                            AlarmColor    = new SolidColorBrush(Color.Parse("#555555"));
+                            AlarmReason   = "";
+                        }
+
+                        // Detecta transição false→true do alarme crítico para log
                         if (data.AlarmActive && !_previousAlarmActive)
                         {
                             string detail = string.IsNullOrEmpty(data.AlarmReason)
@@ -128,19 +156,61 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
                                 : data.AlarmReason;
                             _logService.Add(LogEventType.AlarmTriggered, detail);
                         }
-
                         _previousAlarmActive = data.AlarmActive;
+                    });
+
+                    // Registra leitura para gráfico e exportação
+                    _logService.AddReading(new SensorReading
+                    {
+                        Timestamp     = DateTime.Now,
+                        Temperature   = data.Temperature,
+                        Pressure      = data.Pressure,
+                        MotorSpeed    = data.MotorSpeed,
+                        ProductionCount = data.ProductionCount,
+                        MachineOn     = data.MachineOn,
+                        AlarmActive   = data.AlarmActive,
                     });
                 }
                 else
                 {
-                    _logService.Add(LogEventType.CommError, "Falha de leitura — dispositivo não respondeu.");
+                    _consecutiveErrors++;
+                    _logService.Add(LogEventType.CommError,
+                        $"Falha de leitura ({_consecutiveErrors}/{MaxErrorsBeforeRetry}).");
+
+                    if (_consecutiveErrors >= MaxErrorsBeforeRetry)
+                    {
+                        _consecutiveErrors = 0;
+                        await TryReconnectAsync(ct);
+                    }
                 }
 
                 await Task.Delay(1000, ct);
             }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    private async Task TryReconnectAsync(CancellationToken ct)
+    {
+        for (int attempt = 1; attempt <= MaxReconnectAttempts; attempt++)
+        {
+            if (ct.IsCancellationRequested) return;
+            _logService.Add(LogEventType.CommError,
+                $"Tentativa de reconexão {attempt}/{MaxReconnectAttempts}...");
+
+            bool ok = await _modbusService.ReconnectAsync();
+            if (ok)
+            {
+                _logService.Add(LogEventType.Connected, "Reconectado automaticamente.");
+                return;
+            }
+            if (attempt < MaxReconnectAttempts)
+                await Task.Delay(2000, ct);
+        }
+
+        _logService.Add(LogEventType.Disconnected,
+            "Reconexão falhou após 3 tentativas. Verifique o dispositivo.");
+        await Dispatcher.UIThread.InvokeAsync(StopPolling);
     }
 
     // ── Comandos ─────────────────────────────────────────────────────────────
@@ -220,7 +290,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             : new SolidColorBrush(Color.Parse("#FF5252"));
     }
 
-    partial void OnIsConnectedChanged(bool value)  => NotifyCommandsCanExecuteChanged();
+    partial void OnIsConnectedChanged(bool value)   => NotifyCommandsCanExecuteChanged();
     partial void OnIsCommandBusyChanged(bool value) => NotifyCommandsCanExecuteChanged();
 
     private void NotifyCommandsCanExecuteChanged()

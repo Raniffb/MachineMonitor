@@ -38,7 +38,8 @@ public partial class App : Application
     private static void ConfigureServices(ServiceCollection services)
     {
         // Serviços de infraestrutura
-        services.AddSingleton<ILogService, LogService>();
+        services.AddSingleton<ILogService,      LogService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
 
         // Serviços Modbus
         services.AddSingleton<FakeModbusService>();
@@ -50,6 +51,7 @@ public partial class App : Application
         services.AddSingleton<ConnectionViewModel>();
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<LogViewModel>();
+        services.AddSingleton<TrendsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
 }

@@ -9,27 +9,28 @@ public class FakeModbusService : IModbusService
     private readonly Random _rng = new();
     private int _productionCount = 0;
 
-    // Estado controlado por comandos
     private bool? _forcedMachineOn = null;
 
-    // Alarme latchado: dispara por condição, só limpa via ResetAlarmAsync
-    private bool   _alarmLatched          = false;
-    private string _alarmReason           = "";
-    private DateTime _alarmSuppressedUntil = DateTime.MinValue;
+    // Alarme latchado (crítico): dispara por condição, só limpa via ResetAlarmAsync
+    private bool     _alarmLatched          = false;
+    private string   _alarmReason           = "";
+    private DateTime _alarmSuppressedUntil   = DateTime.MinValue;
 
     // Setpoints
     private double _temperatureBase = 75.0;
     private double _motorSpeedBase  = 1450.0;
 
-    // ── Condições de alarme (espelhadas no tooltip do DashboardView) ──────────
-    // • Temp     > 95 °C          — Superaquecimento
-    // • Pressão  > 7,0 bar        — Sobrepressão
-    // • Pressão  < 1,0 bar        — Baixa pressão
-    // • Máq. ON e Motor < 200 rpm — Falha de partida
-    private const double AlarmTempHigh    =  95.0;
-    private const double AlarmPressHigh   =   7.0;
-    private const double AlarmPressLow    =   1.0;
-    private const double AlarmMotorLow    = 200.0;
+    // ── Limiares críticos (disparam alarme latchado) ──────────────────────────
+    private const double AlarmTempHigh  =  95.0;
+    private const double AlarmPressHigh =   7.0;
+    private const double AlarmPressLow  =   1.0;
+    private const double AlarmMotorLow  = 200.0;
+
+    // ── Limiares de aviso (auto-clearing, abaixo do crítico) ─────────────────
+    private const double WarnTempHigh  =  85.0;
+    private const double WarnPressHigh =   6.0;
+    private const double WarnPressLow  =   1.5;
+    private const double WarnMotorLow  = 300.0;
 
     public bool IsConnected { get; private set; }
 
@@ -45,6 +46,8 @@ public class FakeModbusService : IModbusService
         return true;
     }
 
+    public Task<bool> ReconnectAsync() => ConnectAsync("", 0, 0);
+
     public async Task DisconnectAsync()
     {
         await Task.Delay(300);
@@ -59,30 +62,28 @@ public class FakeModbusService : IModbusService
         bool machineOn = _forcedMachineOn ?? (_rng.NextDouble() > 0.05);
         if (machineOn) _productionCount++;
 
-        // Oscilação normal em volta dos setpoints
         double temperature = _temperatureBase + (_rng.NextDouble() - 0.5) * 10.0;
         double pressure    = 4.5              + _rng.NextDouble() * 1.5;
         double motorSpeed  = machineOn
             ? _motorSpeedBase + (_rng.NextDouble() - 0.5) * 200.0
             : 0;
 
-        // Perturbação de processo: 2 % de chance por ciclo (≈1 vez a cada 50 s).
-        // Provoca um pico que viola uma das condições de alarme.
+        // Perturbação de processo: 2 % de chance por ciclo (≈1 vez a cada 50 s)
         if (!_alarmLatched && DateTime.Now > _alarmSuppressedUntil && _rng.NextDouble() < 0.02)
         {
             switch (_rng.Next(4))
             {
-                case 0: temperature += 20.0 + _rng.NextDouble() * 15.0; break; // 95–110 °C
-                case 1: pressure    +=  3.0 + _rng.NextDouble() *  2.0; break; // 7–9 bar
-                case 2: pressure    -=  3.5 + _rng.NextDouble() *  1.0; break; // 0–1 bar
-                case 3: if (machineOn) motorSpeed = _rng.NextDouble() * 150.0; break; // stall motor
+                case 0: temperature += 20.0 + _rng.NextDouble() * 15.0; break;
+                case 1: pressure    +=  3.0 + _rng.NextDouble() *  2.0; break;
+                case 2: pressure    -=  3.5 + _rng.NextDouble() *  1.0; break;
+                case 3: if (machineOn) motorSpeed = _rng.NextDouble() * 150.0; break;
             }
         }
 
-        // Verifica condições somente fora do período de supressão pós-reset
+        // Verifica condições críticas (latchado)
         if (!_alarmLatched && DateTime.Now > _alarmSuppressedUntil)
         {
-            if (temperature > AlarmTempHigh)
+            if      (temperature > AlarmTempHigh)
                 Latch($"Superaquecimento ({temperature:F1} °C > {AlarmTempHigh} °C)");
             else if (pressure > AlarmPressHigh)
                 Latch($"Sobrepressão ({pressure:F2} bar > {AlarmPressHigh:F1} bar)");
@@ -92,15 +93,32 @@ public class FakeModbusService : IModbusService
                 Latch($"Falha de partida ({motorSpeed:F0} rpm < {AlarmMotorLow:F0} rpm)");
         }
 
+        // Aviso (auto-clearing) — só avalia quando sem alarme crítico ativo
+        bool   warningActive = false;
+        string warningReason = "";
+        if (!_alarmLatched)
+        {
+            if      (temperature > WarnTempHigh)
+            { warningActive = true; warningReason = $"Temp. elevada ({temperature:F1} °C > {WarnTempHigh} °C)"; }
+            else if (pressure > WarnPressHigh)
+            { warningActive = true; warningReason = $"Pressão alta ({pressure:F2} bar > {WarnPressHigh:F1} bar)"; }
+            else if (pressure < WarnPressLow)
+            { warningActive = true; warningReason = $"Pressão baixa ({pressure:F2} bar < {WarnPressLow:F1} bar)"; }
+            else if (machineOn && motorSpeed < WarnMotorLow)
+            { warningActive = true; warningReason = $"Velocidade baixa ({motorSpeed:F0} rpm < {WarnMotorLow:F0} rpm)"; }
+        }
+
         return new MachineData
         {
-            Temperature    = Math.Round(temperature, 1),
-            Pressure       = Math.Round(pressure,    2),
-            MotorSpeed     = Math.Round(Math.Max(0, motorSpeed), 0),
-            MachineOn      = machineOn,
-            AlarmActive    = _alarmLatched,
-            AlarmReason    = _alarmLatched ? _alarmReason : "",
-            ProductionCount = _productionCount
+            Temperature     = Math.Round(temperature, 1),
+            Pressure        = Math.Round(pressure,    2),
+            MotorSpeed      = Math.Round(Math.Max(0, motorSpeed), 0),
+            MachineOn       = machineOn,
+            AlarmActive     = _alarmLatched,
+            AlarmReason     = _alarmLatched ? _alarmReason : "",
+            WarningActive   = warningActive,
+            WarningReason   = warningReason,
+            ProductionCount = _productionCount,
         };
     }
 
@@ -108,7 +126,7 @@ public class FakeModbusService : IModbusService
     {
         _alarmLatched    = true;
         _alarmReason     = reason;
-        _forcedMachineOn = false;   // safe state: desliga ao alarmar
+        _forcedMachineOn = false;
     }
 
     public async Task<bool> TurnOnMachineAsync()

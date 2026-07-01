@@ -301,10 +301,11 @@
                                                    Foreground="{Binding AlarmColor}"/>
                                         <TextBlock Text="{Binding AlarmReason}"
                                                    FontSize="11"
-                                                   Foreground="#FF9999"
+                                                   Foreground="{Binding AlarmColor}"
                                                    TextWrapping="Wrap"
                                                    MaxWidth="220"
-                                                   IsVisible="{Binding AlarmActive}"/>
+                                                   IsVisible="{Binding AlarmReason,
+                                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                     </StackPanel>
                                 </StackPanel>
 

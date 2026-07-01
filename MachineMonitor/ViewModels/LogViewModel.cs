@@ -24,21 +24,39 @@ public partial class LogViewModel : ViewModelBase
     [RelayCommand]
     private async Task ExportToCsvAsync()
     {
-        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow: { } win })
-            return;
-
-        var file = await win.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title             = "Exportar Logs para CSV",
-            DefaultExtension  = "csv",
-            SuggestedFileName = $"MachineMonitor_Log_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
-            FileTypeChoices   = [new FilePickerFileType("CSV") { Patterns = ["*.csv"] }],
-        });
+        var file = await PickSaveFile(
+            "Exportar Eventos para CSV",
+            $"MachineMonitor_Eventos_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
         if (file is not null)
             await _logService.ExportToCsvAsync(file.Path.LocalPath);
     }
 
     [RelayCommand]
+    private async Task ExportReadingsToCsvAsync()
+    {
+        var file = await PickSaveFile(
+            "Exportar Leituras de Sensores para CSV",
+            $"MachineMonitor_Leituras_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+
+        if (file is not null)
+            await _logService.ExportReadingsToCsvAsync(file.Path.LocalPath);
+    }
+
+    [RelayCommand]
     private void ClearLogs() => _logService.Entries.Clear();
+
+    private static async Task<IStorageFile?> PickSaveFile(string title, string suggestedName)
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow: { } win })
+            return null;
+
+        return await win.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title             = title,
+            DefaultExtension  = "csv",
+            SuggestedFileName = suggestedName,
+            FileTypeChoices   = [new FilePickerFileType("CSV") { Patterns = ["*.csv"] }],
+        });
+    }
 }

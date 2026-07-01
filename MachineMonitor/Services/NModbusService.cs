@@ -6,20 +6,14 @@ using System.Threading.Tasks;
 
 namespace MachineMonitor.Services;
 
-/// <summary>
-/// Implementação real do serviço Modbus usando NModbus + TCP.
-///
-/// Mapeamento de funções Modbus:
-///   FC02 ReadDiscreteInputs → DiscreteInputs (EmergencyActive, MachineRunning)
-///   FC04 ReadInputRegisters → InputRegisters (Temperature, Pressure, MotorSpeed, ProductionCounter)
-///   FC05 WriteSingleCoil   → Coils (MachinePower, ResetAlarm)
-///   FC06 WriteSingleRegister → HoldingRegisters (TemperatureSetpoint, MotorSpeedSetpoint)
-/// </summary>
 public class NModbusService : IModbusService
 {
-    private TcpClient? _client;
+    private TcpClient?    _client;
     private IModbusMaster? _master;
-    private byte _unitId;
+    private string _lastHost   = "";
+    private int    _lastPort;
+    private byte   _lastUnitId;
+    private byte   _unitId;
     private string _lastAlarmReason = "";
 
     public bool IsConnected { get; private set; }
@@ -30,8 +24,11 @@ public class NModbusService : IModbusService
         {
             await DisconnectAsync();
 
-            _unitId = unitId;
-            _client = new TcpClient();
+            _lastHost   = host;
+            _lastPort   = port;
+            _lastUnitId = unitId;
+            _unitId     = unitId;
+            _client     = new TcpClient();
 
             using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
             await _client.ConnectAsync(host, port, cts.Token);
@@ -41,7 +38,7 @@ public class NModbusService : IModbusService
             _master.Transport.ReadTimeout  = 2000;
             _master.Transport.WriteTimeout = 2000;
 
-            IsConnected = true;
+            IsConnected      = true;
             _lastAlarmReason = "";
             return true;
         }
@@ -51,6 +48,8 @@ public class NModbusService : IModbusService
             return false;
         }
     }
+
+    public Task<bool> ReconnectAsync() => ConnectAsync(_lastHost, _lastPort, _lastUnitId);
 
     public Task DisconnectAsync()
     {
@@ -68,13 +67,11 @@ public class NModbusService : IModbusService
 
         try
         {
-            // FC04 — lê 4 Input Registers a partir do endereço 0 (30001…30004)
             ushort[] inputRegs = await _master.ReadInputRegistersAsync(
                 _unitId,
                 (ushort)ModbusAddressMap.InputRegisters.Temperature,
                 4);
 
-            // FC02 — lê 2 Discrete Inputs a partir do endereço 0 (10001…10002)
             bool[] discreteInputs = await _master.ReadInputsAsync(
                 _unitId,
                 (ushort)ModbusAddressMap.DiscreteInputs.EmergencyActive,
@@ -86,20 +83,27 @@ public class NModbusService : IModbusService
             bool   alarmActive = discreteInputs[ModbusAddressMap.DiscreteInputs.EmergencyActive];
             bool   machineOn   = discreteInputs[ModbusAddressMap.DiscreteInputs.MachineRunning];
 
-            // Persiste a razão enquanto o alarme estiver ativo.
-            // O pico que disparou o alarme pode durar apenas um ciclo; sem cache,
-            // os ciclos seguintes (valores normalizados) perderiam a causa original.
+            // Cache da razão do alarme crítico: o pico dura só 1 ciclo no Python
             string alarmReason = "";
             if (alarmActive)
             {
                 string inferred = InferAlarmReason(temperature, pressure, machineOn, motorSpeed);
                 if (!string.IsNullOrEmpty(inferred))
-                    _lastAlarmReason = inferred;        // atualiza cache quando identifica
-                alarmReason = _lastAlarmReason;         // usa cache como fallback
+                    _lastAlarmReason = inferred;
+                alarmReason = _lastAlarmReason;
             }
             else
             {
-                _lastAlarmReason = "";                  // limpa ao desativar o alarme
+                _lastAlarmReason = "";
+            }
+
+            // Aviso (auto-clearing) — só quando sem alarme crítico
+            bool   warningActive = false;
+            string warningReason = "";
+            if (!alarmActive)
+            {
+                warningReason = InferWarningReason(temperature, pressure, machineOn, motorSpeed);
+                warningActive = !string.IsNullOrEmpty(warningReason);
             }
 
             return new MachineData
@@ -111,17 +115,17 @@ public class NModbusService : IModbusService
                 AlarmActive     = alarmActive,
                 MachineOn       = machineOn,
                 AlarmReason     = alarmReason,
+                WarningActive   = warningActive,
+                WarningReason   = warningReason,
             };
         }
         catch (Exception)
         {
-            // Conexão perdida inesperadamente
             IsConnected = false;
             return null;
         }
     }
 
-    // Infere a razão do alarme a partir dos valores lidos — mesmos limiares do FakeModbusService
     private static string InferAlarmReason(double temp, double pressure, bool machineOn, double motorSpeed)
     {
         if (temp       > 95.0)             return $"Superaquecimento ({temp:F1} °C > 95 °C)";
@@ -131,55 +135,41 @@ public class NModbusService : IModbusService
         return "";
     }
 
-    // ── Coil writes (FC05) ───────────────────────────────────────────────────
+    private static string InferWarningReason(double temp, double pressure, bool machineOn, double motorSpeed)
+    {
+        if (temp       > 85.0)             return $"Temp. elevada ({temp:F1} °C > 85 °C)";
+        if (pressure   >  6.0)             return $"Pressão alta ({pressure:F2} bar > 6,0 bar)";
+        if (pressure   <  1.5)             return $"Pressão baixa ({pressure:F2} bar < 1,5 bar)";
+        if (machineOn && motorSpeed < 300) return $"Velocidade baixa ({motorSpeed:F0} rpm < 300 rpm)";
+        return "";
+    }
 
-    public Task<bool> TurnOnMachineAsync() =>
-        WriteCoilAsync(ModbusAddressMap.Coils.MachinePower, true);
-
-    public Task<bool> TurnOffMachineAsync() =>
-        WriteCoilAsync(ModbusAddressMap.Coils.MachinePower, false);
-
-    public Task<bool> ResetAlarmAsync() =>
-        WriteCoilAsync(ModbusAddressMap.Coils.ResetAlarm, true);
-
-    // ── Holding register writes (FC06) ───────────────────────────────────────
+    public Task<bool> TurnOnMachineAsync()  => WriteCoilAsync(ModbusAddressMap.Coils.MachinePower, true);
+    public Task<bool> TurnOffMachineAsync() => WriteCoilAsync(ModbusAddressMap.Coils.MachinePower, false);
+    public Task<bool> ResetAlarmAsync()     => WriteCoilAsync(ModbusAddressMap.Coils.ResetAlarm,   true);
 
     public async Task<bool> WriteSetpointsAsync(double temperatureSetpoint, double motorSpeedSetpoint)
     {
-        // Temperatura: converte °C → °C × 10 (ex.: 75.0 → 750)
         bool ok1 = await WriteRegisterAsync(
             ModbusAddressMap.HoldingRegisters.TemperatureSetpoint,
             (ushort)(temperatureSetpoint * 10));
-
-        // Velocidade: RPM direto
         bool ok2 = await WriteRegisterAsync(
             ModbusAddressMap.HoldingRegisters.MotorSpeedSetpoint,
             (ushort)motorSpeedSetpoint);
-
         return ok1 && ok2;
     }
-
-    // ── Helpers internos ─────────────────────────────────────────────────────
 
     private async Task<bool> WriteCoilAsync(int address, bool value)
     {
         if (_master == null) return false;
-        try
-        {
-            await _master.WriteSingleCoilAsync(_unitId, (ushort)address, value);
-            return true;
-        }
+        try { await _master.WriteSingleCoilAsync(_unitId, (ushort)address, value); return true; }
         catch { return false; }
     }
 
     private async Task<bool> WriteRegisterAsync(int address, ushort value)
     {
         if (_master == null) return false;
-        try
-        {
-            await _master.WriteSingleRegisterAsync(_unitId, (ushort)address, value);
-            return true;
-        }
+        try { await _master.WriteSingleRegisterAsync(_unitId, (ushort)address, value); return true; }
         catch { return false; }
     }
 }

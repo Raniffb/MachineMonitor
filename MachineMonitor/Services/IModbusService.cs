@@ -18,4 +18,7 @@ public interface IModbusService
 
     // Holding register writes (FC06) — ModbusAddressMap.HoldingRegisters
     Task<bool> WriteSetpointsAsync(double temperatureSetpoint, double motorSpeedSetpoint);
+
+    // Reconecta usando os parâmetros da última ConnectAsync
+    Task<bool> ReconnectAsync();
 }

@@ -10,22 +10,22 @@ namespace MachineMonitor.ViewModels;
 public partial class ConnectionViewModel : ViewModelBase
 {
     private readonly ModbusServiceProxy _proxy;
-    private readonly ILogService _logService;
+    private readonly ILogService        _logService;
+    private readonly ISettingsService   _settingsService;
 
-    [ObservableProperty] private string _host = "127.0.0.1";
-    [ObservableProperty] private string _port = "5020";
-    [ObservableProperty] private string _unitId = "1";
+    [ObservableProperty] private string _host;
+    [ObservableProperty] private string _port;
+    [ObservableProperty] private string _unitId;
     [ObservableProperty] private string _statusMessage = "Desconectado";
-    [ObservableProperty] private bool _isConnected;
-    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private bool   _isConnected;
+    [ObservableProperty] private bool   _isBusy;
     [ObservableProperty] private IBrush _statusIndicatorColor = Brushes.Gray;
 
-    // ── Seleção de modo ───────────────────────────────────────────────────────
     public string[] Modes { get; } = { "Simulado", "Modbus TCP" };
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSimulatedMode))]
-    private string _selectedMode = "Simulado";
+    private string _selectedMode;
 
     public bool IsSimulatedMode => SelectedMode == "Simulado";
 
@@ -36,10 +36,19 @@ public partial class ConnectionViewModel : ViewModelBase
         StatusIndicatorColor = Brushes.Gray;
     }
 
-    public ConnectionViewModel(ModbusServiceProxy proxy, ILogService logService)
+    public ConnectionViewModel(ModbusServiceProxy proxy, ILogService logService, ISettingsService settingsService)
     {
-        _proxy = proxy;
-        _logService = logService;
+        _proxy           = proxy;
+        _logService      = logService;
+        _settingsService = settingsService;
+
+        // Carrega última configuração salva
+        var s = settingsService.Load();
+        _host         = s.Host;
+        _port         = s.Port;
+        _unitId       = s.UnitId;
+        _selectedMode = s.Mode;
+        _proxy.SetMode(s.Mode == "Modbus TCP" ? ConnectionMode.ModbusTcp : ConnectionMode.Simulated);
     }
 
     [RelayCommand(CanExecute = nameof(CanConnect))]
@@ -68,6 +77,15 @@ public partial class ConnectionViewModel : ViewModelBase
                 : $"Conectado a {Host}:{port}";
             StatusIndicatorColor = new SolidColorBrush(Color.Parse("#00C853"));
             _logService.Add(LogEventType.Connected, $"Conectado — {desc}  (Unit ID {unit})");
+
+            // Persiste configuração usada com sucesso
+            _settingsService.Save(new AppSettings
+            {
+                Host   = Host,
+                Port   = Port,
+                UnitId = UnitId,
+                Mode   = SelectedMode,
+            });
         }
         else
         {
@@ -93,8 +111,8 @@ public partial class ConnectionViewModel : ViewModelBase
         _logService.Add(LogEventType.Disconnected, "Conexão encerrada pelo operador.");
     }
 
-    private bool CanConnect() => !IsConnected && !IsBusy;
-    private bool CanDisconnect() => IsConnected && !IsBusy;
+    private bool CanConnect()    => !IsConnected && !IsBusy;
+    private bool CanDisconnect() =>  IsConnected && !IsBusy;
 
     partial void OnIsConnectedChanged(bool value)
     {

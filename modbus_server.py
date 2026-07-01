@@ -116,7 +116,7 @@ async def update_loop(store):
             # Perturbação de processo: 2% de chance por ciclo (≈1 vez a cada 50 s).
             # Provoca um pico que viola uma das condições de alarme.
             if not alarm_latched and time.time() > alarm_suppressed_until:
-                if random.random() < 0.02:
+                if random.random() < 0.001:
                     upset = random.randint(0, 3)
                     if upset == 0:
                         temperature = round(temperature + 20.0 + random.uniform(0, 15), 1)
