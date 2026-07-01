@@ -25,4 +25,8 @@
     <AvaloniaResource Include="Assets/**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MachineMonitor.Tests" />
+  </ItemGroup>
+
 </Project>

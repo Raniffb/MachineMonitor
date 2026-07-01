@@ -87,7 +87,7 @@ public class NModbusService : IModbusService
             string alarmReason = "";
             if (alarmActive)
             {
-                string inferred = InferAlarmReason(temperature, pressure, machineOn, motorSpeed);
+                string inferred = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed);
                 if (!string.IsNullOrEmpty(inferred))
                     _lastAlarmReason = inferred;
                 alarmReason = _lastAlarmReason;
@@ -98,13 +98,10 @@ public class NModbusService : IModbusService
             }
 
             // Aviso (auto-clearing) — só quando sem alarme crítico
-            bool   warningActive = false;
-            string warningReason = "";
-            if (!alarmActive)
-            {
-                warningReason = InferWarningReason(temperature, pressure, machineOn, motorSpeed);
-                warningActive = !string.IsNullOrEmpty(warningReason);
-            }
+            string warningReason = alarmActive
+                ? ""
+                : AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed);
+            bool warningActive = !string.IsNullOrEmpty(warningReason);
 
             return new MachineData
             {
@@ -124,24 +121,6 @@ public class NModbusService : IModbusService
             IsConnected = false;
             return null;
         }
-    }
-
-    private static string InferAlarmReason(double temp, double pressure, bool machineOn, double motorSpeed)
-    {
-        if (temp       > 95.0)             return $"Superaquecimento ({temp:F1} °C > 95 °C)";
-        if (pressure   >  7.0)             return $"Sobrepressão ({pressure:F2} bar > 7,0 bar)";
-        if (pressure   <  1.0)             return $"Baixa pressão ({pressure:F2} bar < 1,0 bar)";
-        if (machineOn && motorSpeed < 200) return $"Falha de partida ({motorSpeed:F0} rpm < 200 rpm)";
-        return "";
-    }
-
-    private static string InferWarningReason(double temp, double pressure, bool machineOn, double motorSpeed)
-    {
-        if (temp       > 85.0)             return $"Temp. elevada ({temp:F1} °C > 85 °C)";
-        if (pressure   >  6.0)             return $"Pressão alta ({pressure:F2} bar > 6,0 bar)";
-        if (pressure   <  1.5)             return $"Pressão baixa ({pressure:F2} bar < 1,5 bar)";
-        if (machineOn && motorSpeed < 300) return $"Velocidade baixa ({motorSpeed:F0} rpm < 300 rpm)";
-        return "";
     }
 
     public Task<bool> TurnOnMachineAsync()  => WriteCoilAsync(ModbusAddressMap.Coils.MachinePower, true);

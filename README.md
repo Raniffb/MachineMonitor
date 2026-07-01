@@ -17,30 +17,44 @@ O MachineMonitor possui dois modos de operação:
 
 ### Dashboard
 - Leitura em tempo real de **temperatura**, **pressão**, **velocidade do motor** e **contagem de produção**
-- Cards de status da máquina (LIGADA / DESLIGADA) e de alarme (ATIVO / INATIVO)
+- Cards de status da máquina (LIGADA / DESLIGADA) e de alarme (CRÍTICO / AVISO / INATIVO)
 - Exibição da causa do alarme com persistência de cache (evita perda de motivo em picos transientes)
 - Indicador de atualização ao vivo com timestamp
+- **Reconexão automática**: após 3 falhas de leitura consecutivas, tenta reconectar (até 3 tentativas) antes de encerrar a sessão
+
+### Tendências
+- Gráfico histórico (via LiveCharts) de temperatura, pressão e velocidade do motor com base nas últimas leituras registradas
 
 ### Controles do operador
 - Ligar e desligar a máquina
 - Resetar alarme manualmente
 - Enviar setpoints de temperatura (°C) e velocidade do motor (RPM)
 
-### Sistema de alarme
-| Condição | Limiar | Causa |
-|----------|--------|-------|
-| Temperatura alta | > 95 °C | Superaquecimento |
-| Pressão alta | > 7,0 bar | Sobrepressão |
-| Pressão baixa | < 1,0 bar | Baixa pressão |
-| Velocidade baixa (máquina ligada) | < 200 rpm | Falha de partida |
+### Sistema de alarme (dois níveis)
+| Nível | Condição | Limiar | Causa |
+|-------|----------|--------|-------|
+| Crítico (latchado) | Temperatura alta | > 95 °C | Superaquecimento |
+| Crítico (latchado) | Pressão alta | > 7,0 bar | Sobrepressão |
+| Crítico (latchado) | Pressão baixa | < 1,0 bar | Baixa pressão |
+| Crítico (latchado) | Velocidade baixa (máquina ligada) | < 200 rpm | Falha de partida |
+| Aviso (auto-clearing) | Temperatura elevada | > 85 °C | Temp. elevada |
+| Aviso (auto-clearing) | Pressão alta | > 6,0 bar | Pressão alta |
+| Aviso (auto-clearing) | Pressão baixa | < 1,5 bar | Pressão baixa |
+| Aviso (auto-clearing) | Velocidade baixa (máquina ligada) | < 300 rpm | Velocidade baixa |
 
-- Alarme é **latchado**: permanece ativo até reset manual do operador
-- **Safe state**: ao alarmar, a máquina é desligada automaticamente
+- **Alarme crítico** é latchado: permanece ativo até reset manual do operador
+- **Aviso** é auto-clearing: some sozinho assim que a condição normaliza, e só é avaliado quando não há alarme crítico ativo
+- **Safe state**: ao disparar o alarme crítico, a máquina é desligada automaticamente
 - **Janela de supressão** de 3 segundos após reset (evita redisparo imediato)
-- Fluxo do operador: alarme dispara → máquina para → operador reseta → operador religa
+- Fluxo do operador: alarme crítico dispara → máquina para → operador reseta → operador religa
 
-### Log de eventos
-Registra automaticamente: disparo de alarme, reset de alarme, máquina ligada/desligada, alteração de setpoints e erros de comunicação.
+### Log de eventos e exportação
+- Registra automaticamente: disparo de alarme, reset de alarme, máquina ligada/desligada, alteração de setpoints e erros de comunicação
+- **Exportar Eventos**: exporta o log de eventos para CSV
+- **Exportar Leituras**: exporta o histórico de leituras de sensores (até 1000 amostras) para CSV
+
+### Configuração de conexão
+- A última configuração usada com sucesso (host, porta, unit ID e modo) é salva em `%AppData%/MachineMonitor/settings.json` e recarregada automaticamente na próxima abertura do app
 
 ---
 
@@ -49,20 +63,28 @@ Registra automaticamente: disparo de alarme, reset de alarme, máquina ligada/de
 ```
 MachineMonitor/
 ├── Models/
-│   ├── MachineData.cs          — DTO com os dados lidos da máquina
+│   ├── MachineData.cs          — DTO com os dados lidos da máquina (inclui alarme e aviso)
+│   ├── SensorReading.cs        — amostra histórica para gráfico e exportação
+│   ├── AppSettings.cs          — configuração de conexão persistida
 │   └── ModbusAddressMap.cs     — mapa de endereços Modbus
 ├── Services/
-│   ├── IModbusService.cs       — interface de comunicação
+│   ├── IModbusService.cs       — interface de comunicação (inclui ReconnectAsync)
 │   ├── FakeModbusService.cs    — implementação simulada (sem rede)
 │   ├── NModbusService.cs       — implementação real via NModbus TCP
 │   ├── ModbusServiceProxy.cs   — proxy singleton (seleciona Fake ou TCP)
-│   └── LogService.cs           — serviço de log de eventos
+│   ├── LogService.cs           — log de eventos e histórico de leituras
+│   └── ISettingsService.cs / SettingsService.cs — persistência de settings.json
 ├── ViewModels/
-│   ├── DashboardViewModel.cs   — lógica do dashboard (poll loop, comandos)
-│   └── ConnectViewModel.cs     — tela de conexão e seleção de modo
+│   ├── ConnectionViewModel.cs  — tela de conexão, seleção de modo e settings
+│   ├── DashboardViewModel.cs   — lógica do dashboard (poll loop, comandos, reconexão)
+│   ├── TrendsViewModel.cs      — dados do gráfico de tendências
+│   └── LogViewModel.cs         — histórico de eventos e exportações CSV
 ├── Views/
+│   ├── ConnectionView.axaml    — interface de conexão
 │   ├── DashboardView.axaml     — interface do dashboard
-│   └── ConnectView.axaml       — interface de conexão
+│   ├── TrendsView.axaml        — gráfico de tendências
+│   └── LogView.axaml           — interface de log de eventos
+MachineMonitor.Tests/            — testes unitários (xUnit)
 modbus_server.py                — servidor Modbus TCP (Python)
 ```
 
@@ -92,7 +114,11 @@ modbus_server.py                — servidor Modbus TCP (Python)
 - Pacotes NuGet:
   - `Avalonia 11.2.3`
   - `Avalonia.Themes.Fluent 11.2.3`
-  - `CommunityToolkit.Mvvm 8.4.0`
+  - `Avalonia.Fonts.Inter 11.2.3`
+  - `Avalonia.ReactiveUI 11.2.3`
+  - `CommunityToolkit.Mvvm 8.3.2`
+  - `LiveChartsCore.SkiaSharpView.Avalonia 2.0.5`
+  - `Microsoft.Extensions.DependencyInjection 9.0.0`
   - `NModbus 3.0.81`
 
 ### Python (servidor simulado)
@@ -128,12 +154,22 @@ dotnet run
 
 ---
 
+## Testes
+
+O projeto `MachineMonitor.Tests` (xUnit) cobre os limiares de alarme/aviso (`AlarmThresholds`) e o ciclo de vida do alarme crítico no `FakeModbusService` (disparo → safe state → reset → janela de supressão).
+
+```bash
+dotnet test
+```
+
+---
+
 ## Servidor Python — detalhes
 
 O `modbus_server.py` simula a dinâmica real de uma máquina industrial:
 
 - **Oscilação normal**: temperatura ±5 °C em torno do setpoint, pressão entre 4,5–6,0 bar, motor ±100 rpm
-- **Perturbações de processo**: 2% de chance por ciclo (≈ 1 evento a cada 50 s), sorteando aleatoriamente entre superaquecimento, sobrepressão, baixa pressão ou stall do motor
+- **Perturbações de processo**: 0,1% de chance por ciclo (≈ 1 evento a cada 1000 s), sorteando aleatoriamente entre superaquecimento, sobrepressão, baixa pressão ou stall do motor
 - **Safe state**: ao alarmar, o coil de energia da máquina é desligado automaticamente
 - **Console**: exibe linha atualizada em tempo real com todos os valores e status de alarme
 
@@ -146,5 +182,6 @@ O `modbus_server.py` simula a dinâmica real de uma máquina industrial:
 | C# / .NET 8 | Linguagem principal |
 | Avalonia UI 11.2.3 | Interface gráfica multiplataforma |
 | CommunityToolkit.Mvvm | MVVM com source generators |
+| LiveChartsCore.SkiaSharpView.Avalonia | Gráfico de tendências |
 | NModbus 3.0.81 | Cliente Modbus TCP |
 | Python 3 + pymodbus 3.6.9 | Servidor Modbus TCP simulado |
