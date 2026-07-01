@@ -8,6 +8,7 @@ namespace MachineMonitor.Services;
 
 public class NModbusService : IModbusService
 {
+    private readonly ISettingsService _settingsService;
     private TcpClient?    _client;
     private IModbusMaster? _master;
     private string _lastHost   = "";
@@ -17,6 +18,11 @@ public class NModbusService : IModbusService
     private string _lastAlarmReason = "";
 
     public bool IsConnected { get; private set; }
+
+    public NModbusService(ISettingsService settingsService)
+    {
+        _settingsService = settingsService;
+    }
 
     public async Task<bool> ConnectAsync(string host, int port, byte unitId)
     {
@@ -83,11 +89,13 @@ public class NModbusService : IModbusService
             bool   alarmActive = discreteInputs[ModbusAddressMap.DiscreteInputs.EmergencyActive];
             bool   machineOn   = discreteInputs[ModbusAddressMap.DiscreteInputs.MachineRunning];
 
+            var thresholds = _settingsService.Current;
+
             // Cache da razão do alarme crítico: o pico dura só 1 ciclo no Python
             string alarmReason = "";
             if (alarmActive)
             {
-                string inferred = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed);
+                string inferred = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed, thresholds);
                 if (!string.IsNullOrEmpty(inferred))
                     _lastAlarmReason = inferred;
                 alarmReason = _lastAlarmReason;
@@ -100,7 +108,7 @@ public class NModbusService : IModbusService
             // Aviso (auto-clearing) — só quando sem alarme crítico
             string warningReason = alarmActive
                 ? ""
-                : AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed);
+                : AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed, thresholds);
             bool warningActive = !string.IsNullOrEmpty(warningReason);
 
             return new MachineData

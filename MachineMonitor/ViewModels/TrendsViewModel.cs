@@ -8,6 +8,7 @@ using MachineMonitor.Services;
 using SkiaSharp;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace MachineMonitor.ViewModels;
 
@@ -63,6 +64,14 @@ public partial class TrendsViewModel : ViewModelBase
                                new SKPoint(0.5f, 0f), new SKPoint(0.5f, 1f)),
             GeometrySize = 0,
         }];
+
+        // Preenche o gráfico com o histórico persistido antes de assinar novas leituras
+        foreach (var r in logService.GetReadings().TakeLast(MaxPoints))
+        {
+            TempValues.Add(new ObservableValue(r.Temperature));
+            PressValues.Add(new ObservableValue(r.Pressure));
+            MotorValues.Add(new ObservableValue(r.MotorSpeed));
+        }
 
         logService.ReadingAdded += OnReadingAdded;
     }

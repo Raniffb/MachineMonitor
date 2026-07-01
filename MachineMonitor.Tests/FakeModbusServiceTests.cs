@@ -7,7 +7,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task ReadMachineDataAsync_WhenNotConnected_ReturnsNull()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
 
         var data = await service.ReadMachineDataAsync();
 
@@ -17,7 +17,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task ConnectAsync_SetsIsConnectedTrue()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
 
         bool ok = await service.ConnectAsync("host", 502, 1);
 
@@ -28,7 +28,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task DisconnectAsync_SetsIsConnectedFalse()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
         await service.ConnectAsync("host", 502, 1);
 
         await service.DisconnectAsync();
@@ -39,7 +39,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task TurnOnMachineAsync_ForcesMachineOnInSubsequentReadings()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
         await service.ConnectAsync("host", 502, 1);
 
         await service.TurnOnMachineAsync();
@@ -52,7 +52,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task TurnOffMachineAsync_ForcesMachineOffAndZeroMotorSpeed()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
         await service.ConnectAsync("host", 502, 1);
 
         await service.TurnOffMachineAsync();
@@ -69,7 +69,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task CriticalAlarm_MotorStall_LatchesAndForcesSafeState()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
         await service.ConnectAsync("host", 502, 1);
         await service.WriteSetpointsAsync(75, motorSpeedSetpoint: 0);
         await service.TurnOnMachineAsync();
@@ -90,7 +90,7 @@ public class FakeModbusServiceTests
     [Fact]
     public async Task ResetAlarmAsync_ClearsAlarmAndSuppressesImmediateRetrigger()
     {
-        var service = new FakeModbusService();
+        var service = new FakeModbusService(new FakeSettingsService());
         await service.ConnectAsync("host", 502, 1);
         await service.WriteSetpointsAsync(75, motorSpeedSetpoint: 0);
         await service.TurnOnMachineAsync();

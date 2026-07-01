@@ -1,25 +1,28 @@
+using MachineMonitor.Models;
 using MachineMonitor.Services;
 
 namespace MachineMonitor.Tests;
 
 public class AlarmThresholdsTests
 {
+    private static readonly AppSettings DefaultSettings = new();
+
     // ── Sem condição — nada dispara ─────────────────────────────────────────
     [Fact]
     public void InferCriticalReason_NormalValues_ReturnsEmpty()
     {
-        string reason = AlarmThresholds.InferCriticalReason(temperature: 75, pressure: 4.5, machineOn: true, motorSpeed: 1450);
+        string reason = AlarmThresholds.InferCriticalReason(temperature: 75, pressure: 4.5, machineOn: true, motorSpeed: 1450, DefaultSettings);
         Assert.Equal("", reason);
     }
 
     [Fact]
     public void InferWarningReason_NormalValues_ReturnsEmpty()
     {
-        string reason = AlarmThresholds.InferWarningReason(temperature: 75, pressure: 4.5, machineOn: true, motorSpeed: 1450);
+        string reason = AlarmThresholds.InferWarningReason(temperature: 75, pressure: 4.5, machineOn: true, motorSpeed: 1450, DefaultSettings);
         Assert.Equal("", reason);
     }
 
-    // ── Limiares críticos ────────────────────────────────────────────────────
+    // ── Limiares críticos (usando os valores padrão de AppSettings) ─────────
     [Theory]
     [InlineData(96, 4.5, true, 1450, "Superaquecimento")]
     [InlineData(75, 7.1, true, 1450, "Sobrepressão")]
@@ -28,14 +31,14 @@ public class AlarmThresholdsTests
     public void InferCriticalReason_ConditionBreached_ReturnsExpectedReason(
         double temperature, double pressure, bool machineOn, double motorSpeed, string expectedSubstring)
     {
-        string reason = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed);
+        string reason = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed, DefaultSettings);
         Assert.Contains(expectedSubstring, reason);
     }
 
     [Fact]
     public void InferCriticalReason_MotorStall_IgnoredWhenMachineOff()
     {
-        string reason = AlarmThresholds.InferCriticalReason(temperature: 75, pressure: 4.5, machineOn: false, motorSpeed: 0);
+        string reason = AlarmThresholds.InferCriticalReason(temperature: 75, pressure: 4.5, machineOn: false, motorSpeed: 0, DefaultSettings);
         Assert.Equal("", reason);
     }
 
@@ -47,11 +50,11 @@ public class AlarmThresholdsTests
     public void InferCriticalReason_ExactlyAtThreshold_DoesNotTrigger(
         double temperature, double pressure, bool machineOn, double motorSpeed)
     {
-        string reason = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed);
+        string reason = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed, DefaultSettings);
         Assert.Equal("", reason);
     }
 
-    // ── Limiares de aviso ────────────────────────────────────────────────────
+    // ── Limiares de aviso (usando os valores padrão de AppSettings) ─────────
     [Theory]
     [InlineData(86, 4.5, true, 1450, "Temp. elevada")]
     [InlineData(75, 6.1, true, 1450, "Pressão alta")]
@@ -60,7 +63,7 @@ public class AlarmThresholdsTests
     public void InferWarningReason_ConditionBreached_ReturnsExpectedReason(
         double temperature, double pressure, bool machineOn, double motorSpeed, string expectedSubstring)
     {
-        string reason = AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed);
+        string reason = AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed, DefaultSettings);
         Assert.Contains(expectedSubstring, reason);
     }
 
@@ -68,7 +71,30 @@ public class AlarmThresholdsTests
     [Fact]
     public void InferCriticalReason_MultipleConditionsBreached_PrioritizesTemperature()
     {
-        string reason = AlarmThresholds.InferCriticalReason(temperature: 100, pressure: 8.0, machineOn: true, motorSpeed: 100);
+        string reason = AlarmThresholds.InferCriticalReason(temperature: 100, pressure: 8.0, machineOn: true, motorSpeed: 100, DefaultSettings);
         Assert.Contains("Superaquecimento", reason);
+    }
+
+    // ── Limiares customizados: confirma que os valores de AppSettings são realmente usados ─
+    [Fact]
+    public void InferCriticalReason_CustomThresholds_UsesConfiguredValueInsteadOfDefault()
+    {
+        var custom = new AppSettings { CriticalTempHigh = 50.0 };
+
+        // 60°C não dispararia com o padrão (95°C), mas dispara com o limiar customizado (50°C)
+        string reason = AlarmThresholds.InferCriticalReason(temperature: 60, pressure: 4.5, machineOn: true, motorSpeed: 1450, custom);
+
+        Assert.Contains("Superaquecimento", reason);
+    }
+
+    [Fact]
+    public void InferCriticalReason_CustomThresholds_DoesNotTriggerDefaultThreshold()
+    {
+        var custom = new AppSettings { CriticalTempHigh = 150.0 };
+
+        // 96°C dispararia com o padrão (95°C), mas não com o limiar customizado (150°C)
+        string reason = AlarmThresholds.InferCriticalReason(temperature: 96, pressure: 4.5, machineOn: true, motorSpeed: 1450, custom);
+
+        Assert.Equal("", reason);
     }
 }

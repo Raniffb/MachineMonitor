@@ -97,6 +97,87 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- Limiares de alarme (colapsável) -->
+                <StackPanel Spacing="10">
+                    <Button Command="{Binding ToggleThresholdsCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0"
+                            HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="▸" IsVisible="{Binding !ShowThresholds}" Foreground="#00B4D8" FontSize="10"/>
+                            <TextBlock Text="▾" IsVisible="{Binding ShowThresholds}" Foreground="#00B4D8" FontSize="10"/>
+                            <TextBlock Text="LIMIARES DE ALARME" Classes="field-label" Foreground="#00B4D8"/>
+                        </StackPanel>
+                    </Button>
+
+                    <StackPanel Spacing="12" IsVisible="{Binding ShowThresholds}">
+
+                        <TextBlock Text="Aplicados imediatamente ao salvar, sem precisar reconectar."
+                                   FontSize="10" Foreground="#4A5568" TextWrapping="Wrap"/>
+
+                        <TextBlock Text="CRÍTICO (latchado)" Classes="field-label"/>
+                        <Grid ColumnDefinitions="*,10,*" RowDefinitions="Auto,Auto" >
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Temp. alta (°C)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding CriticalTempHigh}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                                <TextBlock Text="Pressão alta (bar)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding CriticalPressHigh}"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,10,*">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Pressão baixa (bar)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding CriticalPressLow}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                                <TextBlock Text="Vel. baixa (rpm)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding CriticalMotorLow}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="AVISO (auto-clearing)" Classes="field-label" Margin="0,6,0,0"/>
+                        <Grid ColumnDefinitions="*,10,*">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Temp. alta (°C)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding WarnTempHigh}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                                <TextBlock Text="Pressão alta (bar)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding WarnPressHigh}"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,10,*">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Pressão baixa (bar)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding WarnPressLow}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                                <TextBlock Text="Vel. baixa (rpm)" FontSize="10" Foreground="#4A5568"/>
+                                <TextBox Text="{Binding WarnMotorLow}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Content="Salvar Limiares"
+                                Command="{Binding SaveThresholdsCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                CornerRadius="7"
+                                Padding="0,9"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Background="#1E2D40"
+                                Foreground="#E2E8F0"/>
+
+                        <TextBlock Text="{Binding ThresholdsMessage}"
+                                   FontSize="10" Foreground="#4A5568"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding ThresholdsMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </StackPanel>
+                </StackPanel>
+
                 <!-- Buttons -->
                 <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
 

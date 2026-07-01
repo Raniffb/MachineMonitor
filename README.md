@@ -1,5 +1,7 @@
 # MachineMonitor
 
+[![CI](https://github.com/Raniffb/MachineMonitor/actions/workflows/ci.yml/badge.svg)](https://github.com/Raniffb/MachineMonitor/actions/workflows/ci.yml)
+
 Simulador SCADA industrial desenvolvido em **C# com Avalonia UI**, utilizando o protocolo **Modbus TCP** para comunicação com dispositivos de campo. O projeto simula o monitoramento e controle de uma máquina industrial em tempo real, com sistema de alarmes, log de eventos e controle de setpoints.
 
 ---
@@ -47,11 +49,13 @@ O MachineMonitor possui dois modos de operação:
 - **Safe state**: ao disparar o alarme crítico, a máquina é desligada automaticamente
 - **Janela de supressão** de 3 segundos após reset (evita redisparo imediato)
 - Fluxo do operador: alarme crítico dispara → máquina para → operador reseta → operador religa
+- **Limiares configuráveis**: a seção "Limiares de Alarme" na tela de conexão permite editar os 8 valores acima. São salvos em `settings.json` e aplicados imediatamente (lidos a cada leitura), sem precisar reconectar
 
 ### Log de eventos e exportação
 - Registra automaticamente: disparo de alarme, reset de alarme, máquina ligada/desligada, alteração de setpoints e erros de comunicação
 - **Exportar Eventos**: exporta o log de eventos para CSV
 - **Exportar Leituras**: exporta o histórico de leituras de sensores (até 1000 amostras) para CSV
+- O histórico de leituras é **persistido em `%AppData%/MachineMonitor/readings.json`**, sobrevivendo a reinícios do app — a tela de Tendências carrega esse histórico ao abrir
 
 ### Configuração de conexão
 - A última configuração usada com sucesso (host, porta, unit ID e modo) é salva em `%AppData%/MachineMonitor/settings.json` e recarregada automaticamente na próxima abertura do app
@@ -156,7 +160,7 @@ dotnet run
 
 ## Testes
 
-O projeto `MachineMonitor.Tests` (xUnit) cobre os limiares de alarme/aviso (`AlarmThresholds`) e o ciclo de vida do alarme crítico no `FakeModbusService` (disparo → safe state → reset → janela de supressão).
+O projeto `MachineMonitor.Tests` (xUnit) cobre os limiares de alarme/aviso — inclusive customizados (`AlarmThresholds`) —, o ciclo de vida do alarme crítico no `FakeModbusService` (disparo → safe state → reset → janela de supressão) e a persistência do histórico de leituras (`LogService`), usando um caminho de arquivo isolado por teste.
 
 ```bash
 dotnet test

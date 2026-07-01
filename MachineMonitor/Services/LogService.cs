@@ -8,6 +8,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace MachineMonitor.Services;
@@ -63,19 +64,57 @@ public class LogService : ILogService
     }
 
     // ── Leituras de sensores ──────────────────────────────────────────────────
+    private static readonly string DefaultReadingsFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "MachineMonitor", "readings.json");
+
+    private readonly string _readingsFilePath;
+    private readonly List<SensorReading> _readings;
+
     public event EventHandler? ReadingAdded;
 
-    private readonly List<SensorReading> _readings = new();
+    public LogService() : this(DefaultReadingsFilePath) { }
+
+    // Permite injetar um caminho isolado em testes, sem tocar no %AppData% real do usuário.
+    internal LogService(string readingsFilePath)
+    {
+        _readingsFilePath = readingsFilePath;
+        _readings         = LoadReadingsFromDisk(readingsFilePath);
+    }
 
     public void AddReading(SensorReading reading)
     {
+        List<SensorReading> snapshot;
         lock (_readings)
         {
             _readings.Add(reading);
             if (_readings.Count > MaxReadings)
                 _readings.RemoveAt(0);
+            snapshot = _readings.ToList();
         }
+        SaveReadingsToDisk(_readingsFilePath, snapshot);
         ReadingAdded?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static List<SensorReading> LoadReadingsFromDisk(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                return JsonSerializer.Deserialize<List<SensorReading>>(File.ReadAllText(path)) ?? new();
+        }
+        catch { }
+        return new();
+    }
+
+    private static void SaveReadingsToDisk(string path, List<SensorReading> readings)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonSerializer.Serialize(readings));
+        }
+        catch { }
     }
 
     public IReadOnlyList<SensorReading> GetReadings()

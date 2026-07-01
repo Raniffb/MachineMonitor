@@ -6,6 +6,7 @@ namespace MachineMonitor.Services;
 
 public class FakeModbusService : IModbusService
 {
+    private readonly ISettingsService _settingsService;
     private readonly Random _rng = new();
     private int _productionCount = 0;
 
@@ -21,6 +22,11 @@ public class FakeModbusService : IModbusService
     private double _motorSpeedBase  = 1450.0;
 
     public bool IsConnected { get; private set; }
+
+    public FakeModbusService(ISettingsService settingsService)
+    {
+        _settingsService = settingsService;
+    }
 
     public async Task<bool> ConnectAsync(string host, int port, byte unitId)
     {
@@ -68,10 +74,12 @@ public class FakeModbusService : IModbusService
             }
         }
 
+        var thresholds = _settingsService.Current;
+
         // Verifica condições críticas (latchado)
         if (!_alarmLatched && DateTime.Now > _alarmSuppressedUntil)
         {
-            string criticalReason = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed);
+            string criticalReason = AlarmThresholds.InferCriticalReason(temperature, pressure, machineOn, motorSpeed, thresholds);
             if (!string.IsNullOrEmpty(criticalReason))
                 Latch(criticalReason);
         }
@@ -79,7 +87,7 @@ public class FakeModbusService : IModbusService
         // Aviso (auto-clearing) — só avalia quando sem alarme crítico ativo
         string warningReason = _alarmLatched
             ? ""
-            : AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed);
+            : AlarmThresholds.InferWarningReason(temperature, pressure, machineOn, motorSpeed, thresholds);
         bool warningActive = !string.IsNullOrEmpty(warningReason);
 
         return new MachineData

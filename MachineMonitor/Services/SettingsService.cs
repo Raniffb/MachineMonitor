@@ -11,7 +11,24 @@ public class SettingsService : ISettingsService
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "MachineMonitor", "settings.json");
 
-    public AppSettings Load()
+    public AppSettings Current { get; private set; }
+
+    public SettingsService()
+    {
+        Current = LoadFromDisk();
+    }
+
+    public AppSettings Load() => Current;
+
+    public void Save(AppSettings settings)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        File.WriteAllText(FilePath,
+            JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+        Current = settings;
+    }
+
+    private static AppSettings LoadFromDisk()
     {
         try
         {
@@ -20,12 +37,5 @@ public class SettingsService : ISettingsService
         }
         catch { }
         return new();
-    }
-
-    public void Save(AppSettings settings)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath,
-            JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
